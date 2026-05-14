@@ -76,16 +76,64 @@ def _wrap_for_llm(schema):
 
 
 def _unwrap_result(result, was_list_schema: bool) -> list:
-    """Normalize LLM output to a list of records.
+    """Normalize LLM output to a flat list of records.
 
-    - If we wrapped a list[X] schema, the result has a `records` attribute.
-    - Otherwise we either pass through a list, or wrap a single model.
+    Three cases:
+    1. We wrapped a list[X] schema → result is the auto-generated `Records`
+       wrapper with a list-valued `records` attribute.
+    2. The user supplied a custom `Records(records=list[X])` wrapper
+       themselves (typical for `build_schema` returning a dynamically built
+       multi-property model). Detect this at runtime by checking for a
+       list-valued `records` attribute and unwrap the same way.
+    3. Otherwise: pass through lists, wrap a single model.
     """
-    if was_list_schema:
-        return list(getattr(result, 'records', []) or [])
+    if result is None:
+        return []
+    inner = getattr(result, 'records', None)
+    if was_list_schema or isinstance(inner, list):
+        return list(inner or [])
     if isinstance(result, list):
         return result
-    return [result] if result is not None else []
+    return [result]
+
+
+def _resolve_structured_method(model, override: Optional[str]) -> str:
+    """Pick the structured-output method the model actually supports.
+
+    OpenAI accepts ``json_schema`` (strict). DeepSeek does not — its API
+    rejects ``response_format={'type': 'json_schema', ...}``. Models that
+    declare ``supports_json_schema = False`` (e.g. ``ChatDeepSeek``) fall
+    back to ``json_mode``, which uses ``response_format={'type':
+    'json_object'}`` and requires the literal word "json" in the prompt.
+    """
+    if override is not None:
+        return override
+    if not getattr(model, 'supports_json_schema', True):
+        return 'json_mode'
+    return 'json_schema'
+
+
+# json_mode requires the literal word "json" in the rendered prompt. Inject
+# this nudge into prompt variables when the user's template doesn't already
+# mention it. (Detection happens later, after the template renders.)
+_JSON_MODE_NUDGE = '\nRespond ONLY with a single JSON object matching the requested schema.'
+
+
+def _ensure_json_keyword(prompt_vars: dict) -> dict:
+    """Append a 'json' nudge to the longest string variable if the rendered
+    prompt won't otherwise contain the word "json".
+
+    Modifies a copy of ``prompt_vars`` so the caller's dict isn't mutated.
+    """
+    if any(isinstance(v, str) and 'json' in v.lower() for v in prompt_vars.values()):
+        return prompt_vars
+    string_keys = [k for k, v in prompt_vars.items() if isinstance(v, str)]
+    if not string_keys:
+        return prompt_vars
+    target = max(string_keys, key=lambda k: len(prompt_vars[k]))
+    nudged = dict(prompt_vars)
+    nudged[target] = prompt_vars[target] + _JSON_MODE_NUDGE
+    return nudged
 
 
 def get_synthesis_paras(paragraphs: list[Paragraph]) -> list[Paragraph]:
@@ -114,6 +162,10 @@ class Extractor:
     strategy: Literal['isolated', 'merged'] = 'merged'
     context_properties: list[str] = []
     max_workers: int = 5
+    # Override the structured-output method passed to with_structured_output.
+    # None = auto-detect ('json_schema' for OpenAI, 'json_mode' for DeepSeek).
+    # Valid values: 'json_schema', 'json_mode', 'function_calling'.
+    structured_output_method: Optional[str] = None
 
     # ── Override hooks ────────────────────────────────────────────────────────
 
@@ -191,13 +243,17 @@ class Extractor:
             )
 
         llm_schema, was_list = _wrap_for_llm(schema)
+        method = _resolve_structured_method(self.model, self.structured_output_method)
         chain = self.prompt | self.model.with_structured_output(
-            schema=llm_schema, method='json_schema'
+            schema=llm_schema, method=method
         )
-        result = chain.invoke({
+        prompt_vars = {
             'text': paragraph.page_content,
             **self.build_prompt_vars(paragraph),
-        })
+        }
+        if method == 'json_mode':
+            prompt_vars = _ensure_json_keyword(prompt_vars)
+        result = chain.invoke(prompt_vars)
         return _unwrap_result(result, was_list)
 
     def run(self, paragraphs: list[Paragraph]) -> list[Extracted]:

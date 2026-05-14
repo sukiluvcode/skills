@@ -24,7 +24,6 @@ from langchain_core.documents import Document
 
 from sisyphus.chain.chain_elements import BaseElement
 from sisyphus.chain.paragraph import Paragraph
-from sisyphus.utils.helper_functions import get_plain_articledb
 
 
 # ── Semantic search config ────────────────────────────────────────────────────
@@ -159,6 +158,10 @@ class Saver(BaseElement):
     """
 
     def __init__(self, db_name: str):
+        # Lazy import: pulling get_plain_articledb at module load triggers
+        # helper_functions → chain.database → chain/__init__ → label.py, a
+        # cycle when helper_functions is the primary entry point.
+        from sisyphus.utils.helper_functions import get_plain_articledb
         self.db = get_plain_articledb(db_name)
         self.db.create_db()
 

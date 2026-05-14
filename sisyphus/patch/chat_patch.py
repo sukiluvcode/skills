@@ -1,4 +1,5 @@
 import os
+from typing import ClassVar
 
 from langchain_openai import ChatOpenAI
 
@@ -17,7 +18,16 @@ class ChatDeepSeek(ChatOpenAI):
     environment.
 
     Models: ``deepseek-v4-pro`` (default) or ``deepseek-v4-flash``.
+
+    Structured output: DeepSeek does not accept OpenAI's strict
+    ``response_format={'type': 'json_schema', ...}``. The Extractor reads
+    ``supports_json_schema`` to pick a compatible method (``json_mode``)
+    and inject the literal word "json" into the prompt, which DeepSeek's
+    json_mode requires.
     """
+
+    # ClassVar so pydantic doesn't treat this as a model field.
+    supports_json_schema: ClassVar[bool] = False
 
     def __init__(self, model: str = "deepseek-v4-pro", **kwargs):
         kwargs.setdefault(

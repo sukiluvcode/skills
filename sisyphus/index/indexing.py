@@ -11,14 +11,12 @@ import os
 from sqlmodel import create_engine
 from tqdm import tqdm
 
-# Defined before the chain import so partially-loaded re-imports
-# (helper_functions → indexing while chain.database is mid-load) still see it.
-DEFAULT_DB_DIR = 'db'
-SUPPORTED_EXTS = ('.html', '.htm', '.pdf')
-logger = logging.getLogger(__name__)
-
+from sisyphus.chain.constants import DEFAULT_DB_DIR
 from sisyphus.chain.database import DocDB
 from .loader import ArticleLoader, FullTextLoader, Loader, PdfLoader
+
+SUPPORTED_EXTS = ('.html', '.htm', '.pdf')
+logger = logging.getLogger(__name__)
 
 
 def _choose_loader(file_path: str, full_text: bool) -> Loader:

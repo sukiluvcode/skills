@@ -37,8 +37,8 @@ from sisyphus.patch import (
     aembed_httpx_client,
     AsyncChroma,
 )
+from sisyphus.chain.constants import DEFAULT_DB_DIR
 from sisyphus.chain.database import DocDB, ResultDB
-from sisyphus.index.indexing import DEFAULT_DB_DIR
 
 
 def get_remote_chromadb(collection_name: str):

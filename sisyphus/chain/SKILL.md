@@ -116,6 +116,10 @@ class StrengthExtractor(Extractor):
     # model    = get_chat_model('deepseek-v4-flash', provider='deepseek')
     prompt     = PROMPT
     strategy   = 'merged'                      # 'merged' | 'isolated'
+    # Optional override; default None → auto:
+    #   OpenAI   → 'json_schema' (strict)
+    #   DeepSeek → 'json_mode'   ('json' keyword auto-injected into the prompt)
+    # structured_output_method = 'function_calling'
 
     def build_prompt_vars(self, paragraph):
         return {'instruction': 'Extract yield strength, UTS, and strain.'}
