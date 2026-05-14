@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "sisyphus",
+  "version": "0.1.0",
+  "description": "Two-stage label → extract pipeline for mining structured data from scientific papers. Run /sisyphus:build to be guided through labeling rules, extraction schemas, and a runnable pipeline. The /sisyphus:reference skill is auto-invoked when working on sisyphus code and supplies the API surface.",
+  "author": {
+    "name": "sukiluvcode",
+    "email": "luvsoike@icloud.com"
+  },
+  "homepage": "https://github.com/sukiluvcode/skills",
+  "repository": "https://github.com/sukiluvcode/skills",
+  "license": "MIT",
+  "keywords": [
+    "materials-science",
+    "text-mining",
+    "extraction",
+    "langchain",
+    "scientific-papers"
+  ]
+}
