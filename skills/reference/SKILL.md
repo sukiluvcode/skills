@@ -399,6 +399,54 @@ print(json.dumps(rows[1:4], indent=2, default=str))
 
 ---
 
+## Providers — what works where
+
+Each model class declares its preferred structured-output methods. The
+Extractor walks the list and picks the first; an explicit
+`structured_output_method` on the Extractor overrides it.
+
+| Provider / model | Preferred methods (in order) | Notes |
+|---|---|---|
+| OpenAI `gpt-5.4-mini` (and other OpenAI) | `json_schema`, `function_calling` | Strict mode preferred; works out of the box |
+| DeepSeek `deepseek-chat` (= v4-flash non-thinking) | `function_calling`, `json_mode` | Default when `get_chat_model(provider='deepseek')` is called with no model name |
+| DeepSeek `deepseek-reasoner` (= v4-flash thinking) | `json_mode` | `function_calling` is auto-filtered: reasoning models cannot do tool calls |
+
+`deepseek-chat` and `deepseek-reasoner` are convenience aliases that DeepSeek
+has flagged for eventual deprecation; both currently map to
+`deepseek-v4-flash` under the hood. Prefer them in code today, plan to switch
+to explicit `deepseek-v4-flash` / `deepseek-v4-pro` + a mode parameter when
+DeepSeek finalises the v4 API.
+
+### `get_chat_model(thinking=...)`
+
+```python
+get_chat_model(provider='deepseek')                 # → deepseek-chat     (tools work)
+get_chat_model(provider='deepseek', thinking=True)  # → deepseek-reasoner (json_mode only)
+get_chat_model('deepseek-v4-pro', provider='deepseek')  # explicit name honored
+```
+
+For Extractor use cases keep `thinking=False`. Only the LLM-filter slot
+of a Labeler benefits from `thinking=True`, and even there only when
+function-calling is not in the way.
+
+### Iterating on an Extractor
+
+`Extractor.dry_run(text)` runs the extractor against a raw string —
+no labeled DocDB, no extraction history. Use it to debug schema /
+prompt issues in seconds instead of minutes.
+
+```python
+records = StrengthExtractor().dry_run("The yield strength of TiAlNb is 850 MPa ...")
+```
+
+### Re-running during development
+
+Pass `fresh=True` to `run_chains_with_extraction_history_multi_threads`
+to wipe the namespace's history before running. Replaces the old
+`rm -rf record/` workaround.
+
+---
+
 ## Reference templates
 
 Templates ship with the plugin. Resolve the plugin root with `${CLAUDE_PLUGIN_ROOT}`, then read:

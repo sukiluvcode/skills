@@ -11,6 +11,7 @@
 
 import asyncio
 import json
+import os
 from abc import ABC, abstractmethod
 from functools import wraps
 from typing import Optional, Sequence, Callable, cast, Type, get_args, get_origin, Union
@@ -20,7 +21,7 @@ from langchain_core.documents import Document
 from sqlmodel import SQLModel, Field, Session, select, JSON, Relationship, text, create_engine, col
 from sqlalchemy.orm import registry
 
-from sisyphus.chain.constants import FAILED
+from sisyphus.chain.constants import DEFAULT_DB_DIR, FAILED
 from sisyphus.chain.paragraph import Paragraph
 
 
@@ -344,3 +345,23 @@ def add_manager_callback(func: Callable, manager: ExtractManager):
             manager.update(key)
         return r
     return wrapper
+
+
+# ── Factories ─────────────────────────────────────────────────────────────────
+# Kept here so chain.* internals can build DBs without importing
+# sisyphus.utils.helper_functions, which used to create an import cycle.
+# `helper_functions` re-exports these for backward compatibility.
+
+def get_plain_articledb(db_name: str) -> 'DocDB':
+    """Return a DocDB for a named SQLite store (no embeddings)."""
+    db_url = 'sqlite:///' + os.path.join(DEFAULT_DB_DIR, db_name + '.db')
+    return DocDB(create_engine(db_url))
+
+
+def get_create_resultdb(db_name: str, default_dir: str = DEFAULT_DB_DIR) -> 'ResultDB':
+    """Return a freshly created ResultDB for a named SQLite store."""
+    result_db = ResultDB(
+        create_engine('sqlite:///' + os.path.join(default_dir, db_name) + '.db')
+    )
+    result_db.create_db()
+    return result_db

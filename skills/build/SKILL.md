@@ -50,7 +50,12 @@ Follow Steps 1–5 of `${CLAUDE_PLUGIN_ROOT}/skills/reference/SKILL.md`:
 
 1. Detect the env (`uv`, `poetry`, `conda`, `pip`).
 2. Verify `import sisyphus`. If the import fails, propose the install command and **wait** — do not run the install silently.
-3. Make sure `OPENAI_API_KEY` is set (env var or `.env`).
+3. Detect which provider key is set in the environment and confirm with the user before generating any model-bound code:
+   - `OPENAI_API_KEY` → use `get_chat_model()` (default).
+   - `DEEPSEEK_API_KEY` → use `get_chat_model(provider='deepseek')`. The default model becomes `deepseek-chat`, which supports tool calling (used by Stage 2). Pass `thinking=True` only if the user explicitly wants reasoning — it disables function calling.
+   - Both set → ask which provider to use; do not pick silently.
+   - Neither set → pause and ask for one. Do not invent a key.
+   Thread the chosen `get_chat_model(...)` call into Stage 2 directly; do not generate a commented-out swap.
 4. Ensure `sisyphus_script/` exists in the project root. Create it silently if missing.
 
 Only proceed to Phase 1 once setup is clean.
@@ -173,6 +178,23 @@ After Stage 1 is confirmed:
 4. The `stage2_chain.compose(...)` / bulk-run lines must be active. Pass the same folder you indexed in Phase 1 (typically `sources/`) as `directory=` — the bulk runner picks up `*.html`, `*.htm`, and `*.pdf` and creates `record/` on demand.
 
 Ask the user to confirm. Edit in place on feedback.
+
+---
+
+### Phase 4.5 — Smoke (optional but recommended)
+
+Before the bulk run, validate the extractor on one paragraph. This catches
+provider / schema / prompt issues in seconds instead of after a full pass.
+
+Generate a tiny `sisyphus_script/smoke.py` that imports the extractor from
+the Stage 2 script and calls `Extractor().dry_run(text)` on a hard-coded
+snippet drawn from a paper the user already has indexed. Ask the user to
+run it and confirm the output looks right. Proceed to the bulk run only
+after confirmation.
+
+If iterating produces stale extraction history (`record/extract_record.sqlite`),
+pass `fresh=True` to `run_chains_with_extraction_history_multi_threads` —
+do not generate a `rm -rf record/` shell command.
 
 ---
 

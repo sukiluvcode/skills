@@ -188,10 +188,15 @@ def run_chains_with_extraction_history_multi_threads(
     namespace: str,
     extract_nums: Optional[int] = None,
     given_names: Optional[list[str]] = None,
+    fresh: bool = False,
 ):
     """Run a chain across an article directory in parallel, skipping already-extracted files.
 
     `namespace` keys the extraction history in record/extract_record.sqlite, e.g. 'nlo/band_gap'.
+
+    Set ``fresh=True`` during development to wipe this namespace's history
+    before running — every file in ``directory`` re-processes regardless
+    of prior runs. Replaces the old ``rm -rf record/`` workaround.
     """
     file_names = given_names or _list_sources(directory)
 
@@ -201,6 +206,8 @@ def run_chains_with_extraction_history_multi_threads(
         db_url='sqlite:///' + os.path.join(RECORD_LOCATION, RECORD_NAME),
     )
     manager.create_schema()
+    if fresh:
+        manager.delete_namespace()
     exists = manager.exists(file_names)
     file_names = [name for name, ex in zip(file_names, exists) if not ex]
 

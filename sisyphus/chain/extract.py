@@ -100,16 +100,20 @@ def _unwrap_result(result, was_list_schema: bool) -> list:
 def _resolve_structured_method(model, override: Optional[str]) -> str:
     """Pick the structured-output method the model actually supports.
 
-    OpenAI accepts ``json_schema`` (strict). DeepSeek does not — its API
-    rejects ``response_format={'type': 'json_schema', ...}``. Models that
-    declare ``supports_json_schema = False`` (e.g. ``ChatDeepSeek``) fall
-    back to ``json_mode``, which uses ``response_format={'type':
-    'json_object'}`` and requires the literal word "json" in the prompt.
+    Each model class declares ``preferred_structured_methods`` as an
+    ordered tuple. We pick the first entry (honoring a user override if
+    set). Unknown classes fall back to ``json_schema`` to preserve
+    historical OpenAI-strict behavior.
     """
     if override is not None:
         return override
-    if not getattr(model, 'supports_json_schema', True):
-        return 'json_mode'
+    methods = getattr(model, 'preferred_structured_methods', None)
+    if methods:
+        # Reasoning-class DeepSeek models cannot do tool calls.
+        name = str(getattr(model, 'model_name', '') or getattr(model, 'model', ''))
+        if 'reasoner' in name.lower():
+            methods = tuple(m for m in methods if m != 'function_calling') or ('json_mode',)
+        return methods[0]
     return 'json_schema'
 
 
@@ -255,6 +259,28 @@ class Extractor:
             prompt_vars = _ensure_json_keyword(prompt_vars)
         result = chain.invoke(prompt_vars)
         return _unwrap_result(result, was_list)
+
+    def dry_run(self, text: str, **prompt_vars) -> list:
+        """Run this extractor against a raw string — no DB, no history.
+
+        Useful for iterating on the schema / prompt without rebuilding the
+        labeled DocDB or polluting extraction history. Wraps the text in
+        a synthetic Paragraph with empty metadata and the extractor's own
+        ``properties`` as labels, then dispatches through ``extract_one``.
+
+        Any keyword arguments shadow values returned by ``build_prompt_vars``.
+        """
+        from langchain_core.documents import Document
+
+        doc = Document(page_content=text, metadata={'source': '<dry_run>', 'sub_titles': ''})
+        para = Paragraph(doc, id_=0, labels=self.properties)
+        original_build = self.build_prompt_vars
+        if prompt_vars:
+            self.build_prompt_vars = lambda _p, _orig=original_build: {**_orig(_p), **prompt_vars}
+        try:
+            return self.extract_one(para)
+        finally:
+            self.build_prompt_vars = original_build
 
     def run(self, paragraphs: list[Paragraph]) -> list[Extracted]:
         groups = self.prepare(paragraphs)

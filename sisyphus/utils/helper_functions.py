@@ -1,33 +1,29 @@
 """
-Convenience factories and rendering helpers for building sisyphus pipelines.
+Convenience factories for building sisyphus pipelines.
 
-Chain-facing helpers
---------------------
-get_plain_articledb   — wrap a SQLite DocDB for the source/labeled store
-get_create_resultdb   — wrap a SQLite ResultDB for the result store
+Model factories (owned here)
+----------------------------
 get_chat_model        — get a chat model (OpenAI gpt-5.4-mini or DeepSeek deepseek-v4-pro)
 get_dspy_lm           — get a dspy.LM (same provider/model defaults as get_chat_model)
 get_remote_chromadb   — get an AsyncChroma backed by a running Chroma server
 get_local_chromadb    — get an AsyncChroma backed by local persistent storage
 
-Rendering helpers (used internally by Paragraph.merge)
--------------------------------------------------------
-render_docs           — format a list of Paragraphs into a paper-like string
-reorder_paras         — deduplicate and sort Paragraphs by id
+DB factories & rendering (re-exported for backward compatibility)
+-----------------------------------------------------------------
+get_plain_articledb, get_create_resultdb, DocDB, ResultDB
+                      — canonical home is ``sisyphus.chain.database``
+render_docs, reorder_paras
+                      — canonical home is ``sisyphus.chain.paragraph``
 
 General utilities
 -----------------
 run_concurrently      — thread-pool map that preserves input order
 """
 
-import os
-import uuid
-from typing import Literal, List
+from concurrent.futures import ThreadPoolExecutor
+from typing import Literal
 
 import chromadb
-from sqlmodel import create_engine
-from pydantic import BaseModel
-from langchain_core.messages import BaseMessage
 
 from sisyphus.patch import (
     OpenAIEmbeddingThrottle,
@@ -37,8 +33,20 @@ from sisyphus.patch import (
     aembed_httpx_client,
     AsyncChroma,
 )
-from sisyphus.chain.constants import DEFAULT_DB_DIR
-from sisyphus.chain.database import DocDB, ResultDB
+# Re-exported for backward compatibility — the canonical homes are
+# sisyphus.chain.database (factories) and sisyphus.chain.paragraph
+# (rendering helpers). They live there so chain.* has no upward
+# dependency on utils.helper_functions.
+from sisyphus.chain.database import (
+    DocDB as DocDB,
+    ResultDB as ResultDB,
+    get_plain_articledb as get_plain_articledb,
+    get_create_resultdb as get_create_resultdb,
+)
+from sisyphus.chain.paragraph import (
+    render_docs as render_docs,
+    reorder_paras as reorder_paras,
+)
 
 
 def get_remote_chromadb(collection_name: str):
@@ -63,30 +71,33 @@ def get_local_chromadb(collection_name: str):
     )
 
 
-def get_plain_articledb(db_name: str) -> DocDB:
-    """Return a DocDB for a named SQLite store (no embeddings)."""
-    db_url = 'sqlite:///' + os.path.join(DEFAULT_DB_DIR, db_name + '.db')
-    return DocDB(create_engine(db_url))
-
-
 def get_chat_model(
     model_name: str | None = None,
     provider: Literal['openai', 'deepseek'] = 'openai',
+    thinking: bool = False,
 ):
     """Return a chat model.
 
     provider='openai'   → ChatOpenAI       (default model: gpt-5.4-mini)
-    provider='deepseek' → ChatDeepSeek     (default model: deepseek-v4-pro;
-                                            also available: deepseek-v4-flash)
+    provider='deepseek' → ChatDeepSeek
+        thinking=False (default)  → ``deepseek-chat``     (tools supported)
+        thinking=True             → ``deepseek-reasoner`` (json_mode only)
+
+    The ``thinking`` flag only chooses a default when ``model_name`` is
+    not supplied; an explicit ``model_name`` is always honored. Extractor
+    use cases (structured output) should keep ``thinking=False`` so
+    function-calling stays available.
 
     DeepSeek uses an OpenAI-compatible API; set DEEPSEEK_API_KEY in env.
     Note: most GPT-5 reasoning models reject the ``temperature`` parameter,
     but ``gpt-5.4-mini`` accepts it, so we keep ``temperature=0``.
     """
     if provider == 'deepseek':
+        if model_name is None:
+            model_name = 'deepseek-reasoner' if thinking else 'deepseek-chat'
         return ChatDeepSeek(
             http_async_client=achat_httpx_client,
-            model=model_name or 'deepseek-v4-pro',
+            model=model_name,
             temperature=0,
         )
     return ChatOpenAIThrottle(
@@ -126,61 +137,7 @@ def get_dspy_lm(
     )
 
 
-def get_create_resultdb(db_name: str, default_dir: str = 'db') -> ResultDB:
-    """Return a freshly created ResultDB for a named SQLite store."""
-    result_db = ResultDB(
-        create_engine('sqlite:///' + os.path.join(default_dir, db_name) + '.db')
-    )
-    result_db.create_db()
-    return result_db
-
-
-# ── Rendering helpers ─────────────────────────────────────────────────────────
-# Used internally by Paragraph.merge; also useful when building custom loaders.
-
-def render_docs(docs, title: str, tables_prefix: str = 'Tables:') -> str:
-    """Render a list of Paragraph/Document objects into a paper-like string.
-
-    Body paragraphs come first (deduplicated, ordered by id); tables are
-    appended at the end to give the LLM a stable layout.
-    """
-    tables = [doc for doc in docs if doc.metadata['sub_titles'] == 'table']
-    paras = reorder_paras([doc for doc in docs if doc.metadata['sub_titles'] != 'table'])
-
-    previous_titles: list[str] = []
-    scratch_pad = [title]
-    for para in paras:
-        if not para.page_content:
-            continue
-        sub_titles = para.metadata['sub_titles'].split('/')
-        title_to_write = [t for t in sub_titles if t not in previous_titles]
-        previous_titles = sub_titles
-        rendered_text = '\n'.join(title_to_write + [para.page_content])
-        if title_to_write:
-            rendered_text = '\n' + rendered_text
-        scratch_pad.append(rendered_text)
-
-    if tables:
-        scratch_pad.append(tables_prefix)
-    for table in tables:
-        scratch_pad.append('\n' + table.page_content)
-    return '\n'.join(scratch_pad)
-
-
-def reorder_paras(paras):
-    """Deduplicate and sort Paragraphs by their integer id."""
-    seen_ids: list[int] = []
-    deduped = []
-    for para in paras:
-        if para.id not in seen_ids:
-            deduped.append(para)
-            seen_ids.append(para.id)
-    return sorted(deduped, key=lambda x: x.id)
-
-
 # ── General utilities ─────────────────────────────────────────────────────────
-
-from concurrent.futures import ThreadPoolExecutor
 
 
 def run_concurrently(function, inputs, max_workers: int = 4):

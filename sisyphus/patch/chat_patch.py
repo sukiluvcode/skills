@@ -6,7 +6,12 @@ from langchain_openai import ChatOpenAI
 
 class ChatOpenAIThrottle(ChatOpenAI):
     """Thin wrapper kept for naming compatibility. No throttling — rate-limiting is handled by the API provider."""
-    pass
+
+    # Per-provider structured-output preference. Extractor walks this list.
+    preferred_structured_methods: ClassVar[tuple[str, ...]] = (
+        'json_schema',
+        'function_calling',
+    )
 
 
 class ChatDeepSeek(ChatOpenAI):
@@ -17,17 +22,20 @@ class ChatDeepSeek(ChatOpenAI):
     ``DEEPSEEK_API_KEY`` and optionally ``DEEPSEEK_BASE_URL`` from the
     environment.
 
-    Models: ``deepseek-v4-pro`` (default) or ``deepseek-v4-flash``.
+    Structured output preferences (in order): ``function_calling`` (tool
+    calls — reliable on non-thinking DeepSeek models) then ``json_mode``
+    as a fallback for reasoning models. DeepSeek rejects OpenAI's strict
+    ``json_schema`` response_format, so it is omitted entirely.
 
-    Structured output: DeepSeek does not accept OpenAI's strict
-    ``response_format={'type': 'json_schema', ...}``. The Extractor reads
-    ``supports_json_schema`` to pick a compatible method (``json_mode``)
-    and inject the literal word "json" into the prompt, which DeepSeek's
-    json_mode requires.
+    Mode is controlled at the call site via the model name:
+    ``deepseek-chat`` (non-thinking, supports tools) vs
+    ``deepseek-reasoner`` (thinking, json_mode only).
     """
 
-    # ClassVar so pydantic doesn't treat this as a model field.
-    supports_json_schema: ClassVar[bool] = False
+    preferred_structured_methods: ClassVar[tuple[str, ...]] = (
+        'function_calling',
+        'json_mode',
+    )
 
     def __init__(self, model: str = "deepseek-v4-pro", **kwargs):
         kwargs.setdefault(

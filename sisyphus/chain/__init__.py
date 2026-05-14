@@ -18,6 +18,7 @@ from .chain_elements import (
     run_chains_with_extraction_history_multi_threads,
     run_chains_with_extraction_history_for_one,
 )
+from .database import DocDB, ResultDB, ExtractManager
 from .paragraph import Paragraph
 from .label import Labeler, Labeling, Saver, SemanticConfig
 from .extract import Extracted, Extraction, Extractor, get_paras_with_props, get_synthesis_paras

@@ -18,6 +18,52 @@ from typing import Iterable, Optional
 from langchain_core.documents import Document
 
 
+# ── Rendering helpers ─────────────────────────────────────────────────────────
+# Used by Paragraph.merge below; also useful when building custom loaders.
+# Kept here (rather than in sisyphus.utils.helper_functions) so chain.* has
+# no upward dependency on utils.helper_functions — the previous arrangement
+# created an import cycle when label.py / paragraph.py loaded first.
+
+def render_docs(docs, title: str, tables_prefix: str = 'Tables:') -> str:
+    """Render a list of Paragraph/Document objects into a paper-like string.
+
+    Body paragraphs come first (deduplicated, ordered by id); tables are
+    appended at the end to give the LLM a stable layout.
+    """
+    tables = [doc for doc in docs if doc.metadata['sub_titles'] == 'table']
+    paras = reorder_paras([doc for doc in docs if doc.metadata['sub_titles'] != 'table'])
+
+    previous_titles: list[str] = []
+    scratch_pad = [title]
+    for para in paras:
+        if not para.page_content:
+            continue
+        sub_titles = para.metadata['sub_titles'].split('/')
+        title_to_write = [t for t in sub_titles if t not in previous_titles]
+        previous_titles = sub_titles
+        rendered_text = '\n'.join(title_to_write + [para.page_content])
+        if title_to_write:
+            rendered_text = '\n' + rendered_text
+        scratch_pad.append(rendered_text)
+
+    if tables:
+        scratch_pad.append(tables_prefix)
+    for table in tables:
+        scratch_pad.append('\n' + table.page_content)
+    return '\n'.join(scratch_pad)
+
+
+def reorder_paras(paras):
+    """Deduplicate and sort Paragraphs by their integer id."""
+    seen_ids: list[int] = []
+    deduped = []
+    for para in paras:
+        if para.id not in seen_ids:
+            deduped.append(para)
+            seen_ids.append(para.id)
+    return sorted(deduped, key=lambda x: x.id)
+
+
 class Paragraph:
     """A labeled paragraph from a paper.
 
@@ -108,8 +154,6 @@ class Paragraph:
         unless `inherit_labels=False`. Tables are appended at the end via
         `render_docs` so the LLM sees a stable layout.
         """
-        from sisyphus.utils.helper_functions import render_docs
-
         if not paragraphs:
             raise ValueError('Paragraph.merge requires at least one paragraph')
 
