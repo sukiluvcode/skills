@@ -181,7 +181,7 @@ class Chain:
         return input_
 
 
-def run_chains_with_extarction_history_multi_threads(
+def run_chains_with_extraction_history_multi_threads(
     chain: Chain,
     directory: Optional[str],
     batch_size: int,

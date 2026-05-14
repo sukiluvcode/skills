@@ -35,7 +35,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator
 
-import processing_template as pt  # alongside this file in agent/references/
+import processing_template as pt  # alongside this file in references/
 
 from sisyphus.chain import (
     Extraction,

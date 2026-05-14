@@ -203,9 +203,9 @@ Return `[]` to drop the paper entirely.
 To process a directory of papers, skipping ones already extracted:
 
 ```python
-from sisyphus.chain import run_chains_with_extarction_history_multi_threads
+from sisyphus.chain import run_chains_with_extraction_history_multi_threads
 
-run_chains_with_extarction_history_multi_threads(
+run_chains_with_extraction_history_multi_threads(
     chain          = stage2_chain,
     directory      = 'articles/',
     batch_size     = 10,
@@ -224,9 +224,9 @@ Pick the smallest one that matches your task and adapt it.
 
 | Pattern                            | File                                            |
 |------------------------------------|-------------------------------------------------|
-| One property, regex only           | `agent/references/single_prop.py`               |
-| Multiple independent properties    | `agent/references/multi_props_isolated.py`      |
-| Coupled properties + synthesis     | `agent/references/multi_props.py`               |
+| One property, regex only           | `references/single_prop.py`               |
+| Multiple independent properties    | `references/multi_props_isolated.py`      |
+| Coupled properties + synthesis     | `references/multi_props.py`               |
 
 Read top-to-bottom — each file is a complete, runnable pipeline.
 

@@ -15,7 +15,7 @@ from .chain_elements import (
     Chain,
     Filter,
     Writer,
-    run_chains_with_extarction_history_multi_threads,
+    run_chains_with_extraction_history_multi_threads,
     run_chains_with_extraction_history_for_one,
 )
 from .paragraph import Paragraph
