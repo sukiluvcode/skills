@@ -335,13 +335,64 @@ from sisyphus.chain import run_chains_with_extraction_history_multi_threads
 
 run_chains_with_extraction_history_multi_threads(
     chain          = stage2_chain,
-    directory      = 'articles/',
+    directory      = 'sources/',           # folder of *.html / *.htm / *.pdf
     batch_size     = 10,
     namespace      = 'nlo/band_gap',
 )
 ```
 
-History lives in `record/extract_record.sqlite`; re-runs are idempotent within a namespace.
+History lives in `record/extract_record.sqlite`; the directory is created on demand. Re-runs are idempotent within a namespace — already-extracted files are skipped. The runner scans `*.html`, `*.htm`, and `*.pdf` in `directory`, so the same `sources/` folder you indexed in Phase 1 is the right value here.
+
+---
+
+## Reading results back
+
+After Stage 2 finishes, **do not hand-write SQL**. Use the methods on `ResultDB` (and the helpers below) — they preserve the schema contract and join the result rows back to their parent document.
+
+```python
+from sisyphus.chain import ResultDB
+from sqlmodel import create_engine
+
+result_db = ResultDB(create_engine('sqlite:///db/hea_results.db'))
+
+# Primary helper — returns list[dict]; the first dict is a metadata header
+# ({model_name, instruction, db_name}); the remaining dicts are the extracted
+# records. Pass with_doi=True to prepend each record's source DOI.
+rows = result_db.load_as_json(
+    model_name='Records',
+    instruction='Extract yield strength, UTS, and strain.',
+    db_name='hea_results',
+    with_doi=False,
+    limit=None,             # cap rows while debugging
+)
+```
+
+When the user asks *"did the extraction work?"* / *"show me the results"* / *"export to JSON"*, reach for `load_as_json` first. Dump it to a file with `json.dump(rows, open('out.json', 'w'), indent=2)` if they want it on disk.
+
+### Useful database methods (cheat-sheet)
+
+`from sisyphus.chain import DocDB, ResultDB, ExtractManager`
+
+| Method | Purpose |
+|---|---|
+| `DocDB.create_db()` | Create the `documents` table on the bound SQLite file. |
+| `DocDB.save_texts(texts, metadatas)` | Batch-insert raw paragraphs; `metadatas[i]` must include `source`. |
+| `DocDB.get(source, with_abstract=False)` | Fetch all `Document` rows whose `meta.source` matches; abstract is injected as `meta['abstract']` when `with_abstract=True`. |
+| `DocDB.dump_state(paragraphs)` | Persist labeled `Paragraph`s — used by `Saver` after Stage 1. |
+| `ResultDB.create_db()` | Create the `documents` and `results` tables. |
+| `ResultDB.save_result(text, metadata, results)` | Persist one paragraph plus its extracted records; `results` may be a list of pydantic models *or* dicts. |
+| `ResultDB.get(source)` | Fetch documents for a source name. |
+| `ResultDB.load_as_json(model_name, instruction, db_name, with_doi=False, limit=None)` | **Preferred reader.** Returns `[header_dict, *record_dicts]`. |
+| `ResultDB.clear_tables()` | Wipe every row in `documents` and `results`. Destructive — confirm before calling. |
+| `ExtractManager(namespace, db_url).return_extracted()` | List file names already processed in a namespace. |
+| `ExtractManager.delete_namespace()` | Drop history for one namespace so its files re-run on the next call. |
+
+If the user wants a quick preview, this one-liner prints the first three records:
+
+```python
+import json
+print(json.dumps(rows[1:4], indent=2, default=str))
+```
 
 ---
 

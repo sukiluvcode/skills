@@ -193,8 +193,9 @@ def run_chains_with_extraction_history_multi_threads(
 
     `namespace` keys the extraction history in record/extract_record.sqlite, e.g. 'nlo/band_gap'.
     """
-    file_names = given_names or _list_html(directory)
+    file_names = given_names or _list_sources(directory)
 
+    os.makedirs(RECORD_LOCATION, exist_ok=True)
     manager = ExtractManager(
         namespace,
         db_url='sqlite:///' + os.path.join(RECORD_LOCATION, RECORD_NAME),
@@ -219,6 +220,7 @@ def run_chains_with_extraction_history_multi_threads(
 
 def run_chains_with_extraction_history_for_one(chain: Chain, file_name: str, namespace: str):
     """Run a chain against a single file, recording it in extraction history."""
+    os.makedirs(RECORD_LOCATION, exist_ok=True)
     manager = ExtractManager(
         namespace,
         db_url='sqlite:///' + os.path.join(RECORD_LOCATION, RECORD_NAME),
@@ -230,6 +232,14 @@ def run_chains_with_extraction_history_for_one(chain: Chain, file_name: str, nam
     runnable(file_name)
 
 
-def _list_html(directory: str) -> list[str]:
-    paths = glob.glob(os.path.join(directory, '*.html'))
-    return [p.split(os.sep)[-1] for p in paths]
+# Extensions matching what sisyphus.index.create_plaindb ingests; the keys
+# stored in the extraction-history table are the original file names, so the
+# bulk runner needs to list every extension the indexer accepts.
+_SOURCE_EXTS = ('*.html', '*.htm', '*.pdf')
+
+
+def _list_sources(directory: str) -> list[str]:
+    paths: list[str] = []
+    for pattern in _SOURCE_EXTS:
+        paths.extend(glob.glob(os.path.join(directory, pattern)))
+    return sorted({p.split(os.sep)[-1] for p in paths})

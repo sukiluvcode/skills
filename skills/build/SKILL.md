@@ -170,9 +170,15 @@ After Stage 1 is confirmed:
    - Every `Record` has a `metadata: MetaData` field; `MetaData` carries the mandatory primary identifier.
    - One field on `Record` per property.
 3. In chat, describe: the extractor's `strategy` (isolated / merged), `properties`, any `context_properties`, the schema shape (already agreed in the plan), and the result-DB namespace. **Do not paste the script.**
-4. The `stage2_chain.compose(...)` / bulk-run lines must be active.
+4. The `stage2_chain.compose(...)` / bulk-run lines must be active. Pass the same folder you indexed in Phase 1 (typically `sources/`) as `directory=` — the bulk runner picks up `*.html`, `*.htm`, and `*.pdf` and creates `record/` on demand.
 
 Ask the user to confirm. Edit in place on feedback.
+
+---
+
+### Inspecting results
+
+When the user asks *"did it work?"*, *"show me the results"*, or wants the records dumped to JSON, **use `ResultDB.load_as_json`** — never hand-write SQL. See the *Reading results back* section in `${CLAUDE_PLUGIN_ROOT}/skills/reference/SKILL.md` for the signature and a method cheat-sheet (`DocDB`, `ResultDB`, `ExtractManager`).
 
 ---
 
