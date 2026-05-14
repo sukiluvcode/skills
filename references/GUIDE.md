@@ -13,6 +13,19 @@ Stage 2 — Extract
     Filter(labeled_db) + load + Extraction(extractor, ...) + Writer(result_db)
 ```
 
+All extraction schemas share the same outermost shape:
+
+```
+Records { records: list[Record] }
+Record  { metadata: MetaData, <one field per property> }
+```
+
+`MetaData` must contain a mandatory primary identifier (`material_name`,
+`composition`, `sample_id`, …). The primary identifier is **never** a labeler
+target — it is always extracted by the LLM from context. Below `Record`,
+properties are flat: one field per property, regardless of whether the
+property's type is a scalar, a model, or a list of models.
+
 ## 1. `single_prop.py` — one property
 
 Use when extracting a single property (band gap, melting point, …).

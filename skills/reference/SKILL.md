@@ -7,6 +7,8 @@ description: API reference for the sisyphus label → extract pipeline. Use when
 
 The `sisyphus` Python package must be importable in the user's **active project environment** (not in the plugin's own venv). Before generating any pipeline code, run the checks below in the user's current working directory.
 
+The six setup steps end with locating (or building) a source DocDB. PDF support ships with the package — `pypdf` is a hard dependency, no extra install needed.
+
 ### Step 1 — detect the environment
 
 Look in the user's working directory:
@@ -84,6 +86,57 @@ Re-run Step 2 to confirm. Only proceed once the import succeeds.
 echo "OPENAI_API_KEY=sk-..." >> .env
 ```
 
+### Step 6 — locate (or build) the source DB
+
+`sisyphus` resolves source databases via `get_plain_articledb('<name>')`, which expects files under `db/` in the project root. Two cases:
+
+**Case A — DB already exists.** Confirm `db/<name>.db` (or `*.sqlite`) is the source. If a stray DB file is at the project root, move it into `db/` (or copy it) and announce in one line. If multiple candidates exist, ask which is the source.
+
+**Case B — Only raw files exist.** If the user has `*.html` / `*.htm` / `*.pdf` files but no DB yet, run the indexer (see *Indexing source files* below). Raw files live under `sources/` by convention.
+
+If neither a DB nor source files exist, pause and ask the user to point at a folder or drop files into `sources/`. Don't invent paths.
+
+---
+
+## Indexing source files
+
+`sisyphus.index.create_plaindb` turns a folder of papers into the `db/<name>.db` that Stage 1 consumes. It auto-detects extensions:
+
+| Extension | Loader | Output Documents |
+|---|---|---|
+| `.html`, `.htm` | `ArticleLoader` (sectioned) or `FullTextLoader` if `full_text=True` | one Document per paragraph, with `sub_titles` carrying the section path |
+| `.pdf` | `PdfLoader` (always page-by-page) | one Document per page; long pages split with the same 200–600 token chunker |
+
+```python
+from sisyphus.index import create_plaindb
+
+create_plaindb(
+    file_folder='sources',   # any directory of HTML / PDF
+    db_name='hea_papers',    # → db/hea_papers.db
+    full_text=False,         # HTML only; PDFs are always page-by-page
+)
+```
+
+Document metadata after indexing:
+
+| Field | HTML (`ArticleLoader`) | PDF (`PdfLoader`) |
+|---|---|---|
+| `source` | file name | file name |
+| `title` | from `<title>` | PDF metadata `Title` or file stem |
+| `sub_titles` | section path (`Methods/Synthesis`) | `Page N` |
+| `doi` | `<head><p><a>` text | *(not set — `Paragraph.merge` skips it if absent)* |
+| `page_number` | *(not set)* | 1-indexed page number |
+
+Failures on individual files are logged and skipped — one corrupt PDF will not abort the run. Re-running over the same `db_name` is safe; existing rows are not duplicated.
+
+If the user wants to test before indexing a large folder, point them at the loaders directly:
+
+```python
+from sisyphus.index import PdfLoader
+docs = list(PdfLoader('sources/example.pdf').lazy_load())
+print(len(docs), docs[0].metadata, docs[0].page_content[:300])
+```
+
 ---
 
 ## Key invariants
@@ -93,6 +146,8 @@ echo "OPENAI_API_KEY=sk-..." >> .env
 - `FAILED` mid-chain signals a hard error; the file is NOT recorded in extraction history.
 - Vector embeddings for semantic search live in the **label stage** (`SemanticConfig`), not in the index step.
 - `patch/` classes (`ChatOpenAIThrottle`, `OpenAIEmbeddingThrottle`) are thin no-op wrappers — do not resurrect the old throttle system.
+- **Schema shape is fixed at the top.** The outermost wrapper is always `Records { records: list[Record] }`. The only list-of-objects in the schema lives at the `records` level. Below `Record`, properties are flat — one field per property — whether the property's type is a scalar, a model, or a list of models.
+- **Every `Record` carries `metadata: MetaData`.** `MetaData` must contain a mandatory primary-identifier field — `material_name`, `composition`, `sample_id`, or similar. The primary identifier is **never** a labeler target; it is always extracted by the LLM from context.
 
 ---
 

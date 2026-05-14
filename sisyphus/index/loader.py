@@ -20,6 +20,7 @@ import tiktoken
 from bs4 import BeautifulSoup as bs
 from langchain_core.documents import Document
 from langchain_core.document_loaders import BaseLoader
+from pypdf import PdfReader
 from pydantic import (
     BaseModel,
     create_model
@@ -262,5 +263,87 @@ class FullTextLoader(Loader):
     
     def add_title(self, text):
         return f'Title: {self.title}\n{text}'
+
+
+def _chunk_long_text(text: str) -> list[str]:
+    """Same token-budget chunker as ArticleLoader.chunk_text, exposed for reuse.
+
+    Returns the input as a single chunk if it is under 400 tokens; otherwise
+    splits at sentence boundaries to keep each chunk in the 200–600 token range.
+    """
+    if len(encoding.encode(text)) <= 400:
+        return [text]
+    sentences = nltk.sent_tokenize(text)
+    token_per_sent = [len(encoding.encode(sent)) for sent in sentences]
+    chunked_texts: list[str] = []
+    accumulate_token = 0
+    next_start_i = 0
+    for i, token in enumerate(token_per_sent):
+        if i == len(token_per_sent) - 1:
+            chunked_texts.append(' '.join(sentences[next_start_i:]))
+            break
+        accumulate_token += token
+        token_left = sum(token_per_sent[i:])
+        if accumulate_token <= 400:
+            continue
+        if token_left >= 200:
+            chunked_texts.append(' '.join(sentences[next_start_i:i]))
+            next_start_i = i
+            accumulate_token = token
+        else:
+            chunked_texts.append(' '.join(sentences[next_start_i:]))
+            break
+    return chunked_texts
+
+
+class PdfLoader(Loader):
+    """Load from PDF files, one Document per page.
+
+    Pages longer than ~400 tokens are split with the same sentence-aware
+    chunker used for HTML. Metadata fields match the downstream contract
+    (`source`, `sub_titles`, `title`); `sub_titles` is set to ``'Page N'``
+    so `render_docs` can group chunks by page.
+    """
+
+    def __init__(self, file_path: str):
+        super().__init__(file_path)
+        self.file_name = file_path.split(os.sep)[-1]
+        self.metadata = create_model(
+            'MetaData',
+            source=(str, ...),
+            sub_titles=(str, ...),
+            title=(str, ...),
+            page_number=(int, ...),
+        )
+
+    def lazy_load(self) -> Iterator[Document]:
+        reader = PdfReader(self.file_path)
+        title = self._resolve_title(reader)
+        for page_idx, page in enumerate(reader.pages):
+            page_no = page_idx + 1
+            text = (page.extract_text() or '').strip()
+            if not text:
+                continue
+            for chunk in _chunk_long_text(text):
+                yield Document(
+                    page_content=chunk,
+                    metadata=dict(self.metadata(
+                        source=self.file_name,
+                        sub_titles=f'Page {page_no}',
+                        title=title,
+                        page_number=page_no,
+                    )),
+                )
+
+    async def alazy_load(self) -> AsyncIterator[Document]:
+        for doc in self.lazy_load():
+            yield doc
+
+    def _resolve_title(self, reader: PdfReader) -> str:
+        meta = reader.metadata
+        if meta and getattr(meta, 'title', None):
+            return str(meta.title).strip()
+        return os.path.splitext(self.file_name)[0]
+
 
 # endregion

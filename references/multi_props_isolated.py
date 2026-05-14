@@ -8,6 +8,13 @@ Use when 2–5 properties are independent of each other (no co-location needed)
 and you want each LLM call to focus on a single property. For coupled
 extraction (e.g. HEAs where strength refers back to synthesis steps), see
 multi_props.py.
+
+Schema shape (invariant across all templates):
+    Records { records: list[Record] }
+    Record  { metadata: MetaData, <one field per property> }
+Each per-property extractor produces its own per-property `Record` — but every
+`Record` carries `metadata: MetaData` with the mandatory primary identifier
+(`material_name`). The primary identifier is never a labeler target.
 """
 import re
 from typing import List, Optional
@@ -72,7 +79,17 @@ stage1_chain = (
 # STAGE 2 — Extract from labeled DB
 # ═══════════════════════════════════════════════════════
 
-# ── Pydantic models (one per property) ────────────────────────────────────────
+# ── Shared metadata model (mandatory on every Record) ─────────────────────────
+
+class MetaData(BaseModel):
+    """Mandatory metadata on every record. `material_name` is always present
+    and is extracted by the LLM from context — never a labeler target."""
+    material_name: str = Field(
+        description="Name or composition of the material this record describes, e.g. 'CoCrFeMnNi', 'Al0.5CoCrFeNi'."
+    )
+
+
+# ── Per-property field models ────────────────────────────────────────────────
 
 class Strength(BaseModel):
     ys: Optional[str] = Field(description="Yield strength with unit, e.g. '500 MPa'")
@@ -88,6 +105,23 @@ class GrainSize(BaseModel):
     grain_size: str = Field(description="Average grain size with unit, e.g. '10 μm'")
 
 
+# ── Per-property record models (flat: metadata + one property field) ─────────
+
+class StrengthRecord(BaseModel):
+    metadata: MetaData
+    strength: Strength
+
+
+class PhaseRecord(BaseModel):
+    metadata: MetaData
+    phase: Phase
+
+
+class GrainSizeRecord(BaseModel):
+    metadata: MetaData
+    grain_size: GrainSize
+
+
 # ── Shared prompt ─────────────────────────────────────────────────────────────
 
 PROMPT = ChatPromptTemplate([
@@ -97,40 +131,53 @@ PROMPT = ChatPromptTemplate([
 
 MODEL = ChatOpenAI(model_name='gpt-4.1', temperature=0)
 
+_METADATA_NOTE = (
+    "Every record MUST include `metadata.material_name` — the name or composition "
+    "of the material this measurement refers to. Extract it from surrounding context."
+)
+
 
 # ── Extractors ────────────────────────────────────────────────────────────────
 
 class StrengthExtractor(Extractor):
     properties = ['strength']
-    schema = list[Strength]
+    schema = list[StrengthRecord]
     model = MODEL
     prompt = PROMPT
     strategy = 'merged'
 
     def build_prompt_vars(self, paragraph):
-        return {'instruction': 'Extract yield strength (ys), ultimate tensile/compressive strength (uts), and fracture strain. Include units.'}
+        return {'instruction': (
+            'Extract yield strength (ys), ultimate tensile/compressive strength (uts), '
+            'and fracture strain. Include units. ' + _METADATA_NOTE
+        )}
 
 
 class PhaseExtractor(Extractor):
     properties = ['phase']
-    schema = list[Phase]
+    schema = list[PhaseRecord]
     model = MODEL
     prompt = PROMPT
     strategy = 'merged'
 
     def build_prompt_vars(self, paragraph):
-        return {'instruction': 'Extract crystal phases present in the material (e.g., FCC, BCC, HCP, B2, L12).'}
+        return {'instruction': (
+            'Extract crystal phases present in the material (e.g., FCC, BCC, HCP, B2, L12). '
+            + _METADATA_NOTE
+        )}
 
 
 class GrainSizeExtractor(Extractor):
     properties = ['grain_size']
-    schema = list[GrainSize]
+    schema = list[GrainSizeRecord]
     model = MODEL
     prompt = PROMPT
     strategy = 'merged'
 
     def build_prompt_vars(self, paragraph):
-        return {'instruction': 'Extract grain size information with units.'}
+        return {'instruction': (
+            'Extract grain size information with units. ' + _METADATA_NOTE
+        )}
 
 
 def load_from_labeled_db(docs):

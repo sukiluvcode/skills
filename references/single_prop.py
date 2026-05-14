@@ -7,6 +7,12 @@ Pipeline shape:
 Use this template for any single-property extraction (band gap, melting point,
 thermal conductivity, etc.) — swap the regex, the Pydantic model, and the
 prompt instruction.
+
+Schema shape (invariant across all templates):
+    Records { records: list[Record] }
+    Record  { metadata: MetaData,  <one field per property> }
+`MetaData` carries the mandatory primary identifier (`material_name`). The
+primary identifier is never a labeler target — the LLM always extracts it.
 """
 import re
 from typing import Literal, Optional
@@ -53,6 +59,14 @@ stage1_chain = Filter(get_plain_articledb('nlo')) + Labeling(bandgap_labeler) + 
 # STAGE 2 — Extract from labeled DB
 # ═══════════════════════════════════════════════════════
 
+class MetaData(BaseModel):
+    """Mandatory metadata on every record. `material_name` is always present
+    and is extracted by the LLM from context — never a labeler target."""
+    material_name: str = Field(
+        description="Name or composition of the material this record describes, e.g. 'GaAs', 'MoS2', 'Cs2AgBiBr6'."
+    )
+
+
 class Bandgap(BaseModel):
     """One bandgap measurement extracted from a paper."""
     bandgap: Optional[str] = Field(description="Bandgap value with unit, e.g., '1.5 eV'")
@@ -64,20 +78,28 @@ class Bandgap(BaseModel):
     )
 
 
+class Record(BaseModel):
+    """One material + one bandgap measurement."""
+    metadata: MetaData
+    bandgap: Bandgap
+
+
 PROMPT = ChatPromptTemplate([
     ('system', 'You are a helpful assistant that extracts information from scientific papers.'),
     ('user', '[START OF PAPER]\n{text}\n[END OF PAPER]\n\nInstruction:\n{instruction}'),
 ])
 
 INSTRUCTION = (
-    "Extract bandgap information: value with unit, type (direct or indirect), "
-    "and measurement method. Return one record per distinct measurement."
+    "Extract bandgap information for each material reported. For every record, "
+    "include the material name/composition in `metadata.material_name`, plus the "
+    "bandgap value with unit, the type (direct or indirect), and the measurement "
+    "method. Return one record per distinct measurement."
 )
 
 
 class BandgapExtractor(Extractor):
     properties = ['band_gap']
-    schema = list[Bandgap]                # framework auto-wraps -> Records
+    schema = list[Record]                  # framework auto-wraps -> Records { records: list[Record] }
     model = ChatOpenAI(model_name='gpt-4.1', temperature=0)
     prompt = PROMPT
     strategy = 'merged'                    # one rich call per paper
