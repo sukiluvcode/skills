@@ -32,7 +32,7 @@ load_dotenv()
 import dspy
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator
 
 import processing_template as pt  # alongside this file in references/
@@ -48,7 +48,7 @@ from sisyphus.chain import (
     SemanticConfig,
     Writer,
 )
-from sisyphus.utils.helper_functions import get_create_resultdb, get_plain_articledb
+from sisyphus.utils.helper_functions import get_chat_model, get_create_resultdb, get_plain_articledb
 
 
 warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
@@ -369,7 +369,7 @@ class HeaExtractor(Extractor):
     properties = ['strength', 'phase', 'grain_size', 'synthesis']
     context_properties = ['synthesis']     # always include synthesis paragraphs as context
     strategy = 'merged'
-    model = ChatOpenAI(model_name='gpt-4.1', temperature=0)
+    model = get_chat_model()                            # default: gpt-5.4-mini; swap with provider='deepseek'
     prompt = PROMPT
 
     def _props_for(self, paragraph: Paragraph) -> list[str]:

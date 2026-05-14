@@ -21,7 +21,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from sisyphus.chain import (
@@ -34,7 +33,7 @@ from sisyphus.chain import (
     Saver,
     Writer,
 )
-from sisyphus.utils.helper_functions import get_create_resultdb, get_plain_articledb
+from sisyphus.utils.helper_functions import get_chat_model, get_create_resultdb, get_plain_articledb
 
 
 # ═══════════════════════════════════════════════════════
@@ -100,7 +99,7 @@ INSTRUCTION = (
 class BandgapExtractor(Extractor):
     properties = ['band_gap']
     schema = list[Record]                  # framework auto-wraps -> Records { records: list[Record] }
-    model = ChatOpenAI(model_name='gpt-4.1', temperature=0)
+    model = get_chat_model()                             # default: gpt-5.4-mini; swap with provider='deepseek'
     prompt = PROMPT
     strategy = 'merged'                    # one rich call per paper
 

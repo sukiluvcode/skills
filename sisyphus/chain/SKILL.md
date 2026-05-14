@@ -99,7 +99,7 @@ boilerplate.
 
 ```python
 from sisyphus.chain import Extractor
-from langchain_openai import ChatOpenAI
+from sisyphus.utils.helper_functions import get_chat_model
 from langchain_core.prompts import ChatPromptTemplate
 
 PROMPT = ChatPromptTemplate([
@@ -110,7 +110,10 @@ PROMPT = ChatPromptTemplate([
 class StrengthExtractor(Extractor):
     properties = ['strength']                  # which labels to target
     schema     = list[Strength]                # accepts list[X] or X
-    model      = ChatOpenAI(model='gpt-4.1', temperature=0)
+    model      = get_chat_model()              # OpenAI gpt-5.4-mini (default)
+    # DeepSeek (OpenAI-compatible API; needs DEEPSEEK_API_KEY):
+    # model    = get_chat_model(provider='deepseek')                 # deepseek-v4-pro
+    # model    = get_chat_model('deepseek-v4-flash', provider='deepseek')
     prompt     = PROMPT
     strategy   = 'merged'                      # 'merged' | 'isolated'
 

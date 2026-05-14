@@ -5,7 +5,7 @@ Chain-facing helpers
 --------------------
 get_plain_articledb   — wrap a SQLite DocDB for the source/labeled store
 get_create_resultdb   — wrap a SQLite ResultDB for the result store
-get_chat_model        — get a ChatOpenAI instance (default: gpt-3.5-turbo)
+get_chat_model        — get a chat model (OpenAI gpt-5.4-mini or DeepSeek deepseek-v4-pro)
 get_remote_chromadb   — get an AsyncChroma backed by a running Chroma server
 get_local_chromadb    — get an AsyncChroma backed by local persistent storage
 
@@ -31,6 +31,7 @@ from langchain_core.messages import BaseMessage
 from sisyphus.patch import (
     OpenAIEmbeddingThrottle,
     ChatOpenAIThrottle,
+    ChatDeepSeek,
     achat_httpx_client,
     aembed_httpx_client,
     AsyncChroma,
@@ -68,11 +69,29 @@ def get_plain_articledb(db_name: str) -> DocDB:
 
 
 def get_chat_model(
-    model_name: Literal['gpt-3.5-turbo', 'gpt-4o', 'gpt-4.1'] = 'gpt-4o',
+    model_name: str | None = None,
+    provider: Literal['openai', 'deepseek'] = 'openai',
 ):
-    """Return a ChatOpenAI instance. Defaults to gpt-4o."""
+    """Return a chat model.
+
+    provider='openai'   → ChatOpenAI       (default model: gpt-5.4-mini)
+    provider='deepseek' → ChatDeepSeek     (default model: deepseek-v4-pro;
+                                            also available: deepseek-v4-flash)
+
+    DeepSeek uses an OpenAI-compatible API; set DEEPSEEK_API_KEY in env.
+    Note: most GPT-5 reasoning models reject the ``temperature`` parameter,
+    but ``gpt-5.4-mini`` accepts it, so we keep ``temperature=0``.
+    """
+    if provider == 'deepseek':
+        return ChatDeepSeek(
+            http_async_client=achat_httpx_client,
+            model=model_name or 'deepseek-v4-pro',
+            temperature=0,
+        )
     return ChatOpenAIThrottle(
-        http_async_client=achat_httpx_client, model_name=model_name, temperature=0
+        http_async_client=achat_httpx_client,
+        model_name=model_name or 'gpt-5.4-mini',
+        temperature=0,
     )
 
 
