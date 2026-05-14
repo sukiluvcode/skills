@@ -6,6 +6,7 @@ Chain-facing helpers
 get_plain_articledb   — wrap a SQLite DocDB for the source/labeled store
 get_create_resultdb   — wrap a SQLite ResultDB for the result store
 get_chat_model        — get a chat model (OpenAI gpt-5.4-mini or DeepSeek deepseek-v4-pro)
+get_dspy_lm           — get a dspy.LM (same provider/model defaults as get_chat_model)
 get_remote_chromadb   — get an AsyncChroma backed by a running Chroma server
 get_local_chromadb    — get an AsyncChroma backed by local persistent storage
 
@@ -92,6 +93,36 @@ def get_chat_model(
         http_async_client=achat_httpx_client,
         model_name=model_name or 'gpt-5.4-mini',
         temperature=0,
+    )
+
+
+def get_dspy_lm(
+    model_name: str | None = None,
+    provider: Literal['openai', 'deepseek'] = 'openai',
+    max_tokens: int = 3000,
+):
+    """Return a ``dspy.LM`` mirroring ``get_chat_model``'s provider/defaults.
+
+    provider='openai'   → openai/gpt-5.4-mini   (uses ``max_completion_tokens``;
+                                                 ``max_tokens`` is rejected by
+                                                 the gpt-5 family)
+    provider='deepseek' → deepseek/deepseek-v4-pro (uses ``max_tokens``; also
+                                                 available: deepseek-v4-flash;
+                                                 set DEEPSEEK_API_KEY in env)
+    """
+    import dspy  # lazy: dspy is heavy and only loaded when actually used
+    if provider == 'deepseek':
+        return dspy.LM(
+            f"deepseek/{model_name or 'deepseek-v4-pro'}",
+            max_tokens=max_tokens,
+        )
+    # DSPy 3.2.x regex for the gpt-5 "reasoning" family does NOT match
+    # "gpt-5.4-mini" (no '-' before '.4'), so DSPy keeps passing the legacy
+    # ``max_tokens``. We override by passing ``max_completion_tokens`` directly
+    # and leaving ``max_tokens=None``.
+    return dspy.LM(
+        f"openai/{model_name or 'gpt-5.4-mini'}",
+        max_completion_tokens=max_tokens,
     )
 
 

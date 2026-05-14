@@ -48,7 +48,12 @@ from sisyphus.chain import (
     SemanticConfig,
     Writer,
 )
-from sisyphus.utils.helper_functions import get_chat_model, get_create_resultdb, get_plain_articledb
+from sisyphus.utils.helper_functions import (
+    get_chat_model,
+    get_create_resultdb,
+    get_dspy_lm,
+    get_plain_articledb,
+)
 
 
 warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
@@ -56,7 +61,7 @@ warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
 
 # ── DSPy + vector-store setup ─────────────────────────────────────────────────
 
-lm = dspy.LM('openai/gpt-4.1', max_tokens=3000)
+lm = get_dspy_lm()                     # default: openai/gpt-5.4-mini; swap with provider='deepseek'
 dspy.configure(lm=lm)
 
 embeddings = OpenAIEmbeddings(model='text-embedding-3-large')
