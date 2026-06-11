@@ -47,23 +47,23 @@ Show the user the right command for their environment. **Do not run it silently*
 
 ```bash
 # uv project
-uv add "sisyphus @ git+https://github.com/sukiluvcode/skills.git"
+uv add "sisyphus @ git+https://github.com/sukiluvcode/sisyphus-skill.git"
 
 # poetry
-poetry add "git+https://github.com/sukiluvcode/skills.git"
+poetry add "git+https://github.com/sukiluvcode/sisyphus-skill.git"
 
 # pipenv
-pipenv install "git+https://github.com/sukiluvcode/skills.git#egg=sisyphus"
+pipenv install "git+https://github.com/sukiluvcode/sisyphus-skill.git#egg=sisyphus"
 
 # conda env (after activating it) or plain pip / venv
-pip install "git+https://github.com/sukiluvcode/skills.git"
+pip install "git+https://github.com/sukiluvcode/sisyphus-skill.git"
 ```
 
 If the user has no project environment yet, recommend:
 
 ```bash
 # fastest path — uv
-uv init && uv add "sisyphus @ git+https://github.com/sukiluvcode/skills.git"
+uv init && uv add "sisyphus @ git+https://github.com/sukiluvcode/sisyphus-skill.git"
 ```
 
 ### Step 4 — common install issues

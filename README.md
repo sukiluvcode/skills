@@ -13,11 +13,11 @@ The plugin gives you a `/sisyphus:build` slash command that walks you through la
 This repo *is* a Claude Code marketplace. Add it, then install:
 
 ```text
-/plugin marketplace add sukiluvcode/skills
-/plugin install sisyphus@sukiluvcode-skills
+/plugin marketplace add sukiluvcode/sisyphus-skill
+/plugin install sisyphus@sisyphus-skill
 ```
 
-`/plugin marketplace update sukiluvcode-skills` pulls later releases.
+`/plugin marketplace update sisyphus-skill` pulls later releases.
 
 ### Option B — local development (this directory)
 
@@ -37,12 +37,12 @@ The `/sisyphus:build` command will detect your environment and suggest the right
 
 | Your project uses | Command |
 |---|---|
-| **uv** (uv.lock present) | `uv add "sisyphus @ git+https://github.com/sukiluvcode/skills.git"` |
-| **poetry** (poetry.lock) | `poetry add "git+https://github.com/sukiluvcode/skills.git"` |
-| **pipenv** (Pipfile) | `pipenv install "git+https://github.com/sukiluvcode/skills.git#egg=sisyphus"` |
-| **conda** (env activated) | `pip install "git+https://github.com/sukiluvcode/skills.git"` |
-| plain **pip / venv** | `pip install "git+https://github.com/sukiluvcode/skills.git"` |
-| **no env yet** (recommended) | `uv init && uv add "sisyphus @ git+https://github.com/sukiluvcode/skills.git"` |
+| **uv** (uv.lock present) | `uv add "sisyphus @ git+https://github.com/sukiluvcode/sisyphus-skill.git"` |
+| **poetry** (poetry.lock) | `poetry add "git+https://github.com/sukiluvcode/sisyphus-skill.git"` |
+| **pipenv** (Pipfile) | `pipenv install "git+https://github.com/sukiluvcode/sisyphus-skill.git#egg=sisyphus"` |
+| **conda** (env activated) | `pip install "git+https://github.com/sukiluvcode/sisyphus-skill.git"` |
+| plain **pip / venv** | `pip install "git+https://github.com/sukiluvcode/sisyphus-skill.git"` |
+| **no env yet** (recommended) | `uv init && uv add "sisyphus @ git+https://github.com/sukiluvcode/sisyphus-skill.git"` |
 
 The package is heavy (langchain, chromadb, faiss, dspy …) — expect a few minutes for the first install.
 

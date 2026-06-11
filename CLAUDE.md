@@ -55,7 +55,7 @@ plugins/sisyphus/    # The Claude Code plugin (this is what gets installed)
     processing_template.py # Synthesis process templates
 ```
 
-The repo is **both** a marketplace and the home of the Python package. The plugin (`plugins/sisyphus/`) ships only skills + templates; the `sisyphus/` package is installed separately into the user's project env via `git+https://github.com/sukiluvcode/skills.git`, not bundled into the plugin.
+The repo is **both** a marketplace and the home of the Python package. The plugin (`plugins/sisyphus/`) ships only skills + templates; the `sisyphus/` package is installed separately into the user's project env via `git+https://github.com/sukiluvcode/sisyphus-skill.git`, not bundled into the plugin.
 
 ## Key invariants
 
