@@ -14,9 +14,11 @@ import pandas as pd
 def log(log_file_name="log.log", logging_level=10):
     log_dir_path = os.path.join(os.getcwd(), "log")
     log_file = os.path.join(log_dir_path, log_file_name)
-    
-    # create a log file if not exist
-    if not os.path.exists(log_file):    
+
+    # create the log dir + file if they don't exist (so importing modules that
+    # call log() at import time works from any working directory)
+    os.makedirs(log_dir_path, exist_ok=True)
+    if not os.path.exists(log_file):
         with open(log_file, "w"):
             pass
 

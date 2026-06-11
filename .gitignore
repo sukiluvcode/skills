@@ -7,4 +7,10 @@ db/
 chroma/
 uploads/
 log/
+# pipeline runtime outputs (sisyphus run)
+data_articles/
+articles_unprocessed/
+articles_processed/
+INFO.txt
+si_metadata.csv
 **/.DS_Store

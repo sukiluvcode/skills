@@ -254,8 +254,9 @@ Read top-to-bottom — each file is a complete, runnable pipeline.
 
 ## What this skill deliberately does NOT do
 
-- Article download (use `sisyphus/crawler/`).
-- HTML → paragraph parsing / indexing (use `sisyphus/index/`).
+- Ingestion — download, parse, index (stages 1–3). Use the `sisyphus run` CLI
+  (or `sisyphus.crawler` / `sisyphus.parse` / `sisyphus.index` directly). It
+  produces the source DocDB this chain reads.
 - Cross-paper aggregation, plotting, ML training (out of scope here).
 
 The chain is just the label→extract step. Keep it focused.

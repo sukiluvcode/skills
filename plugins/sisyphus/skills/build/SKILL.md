@@ -66,9 +66,13 @@ Only proceed to Phase 1 once setup is clean.
 
 **Goal: agree on what we're indexing, and produce a source DocDB.** This phase is where the user points at — or uploads — their input files. Do **not** start the Plan until the source DB exists and is named.
 
-Sisyphus expects:
-- Raw input files under `sources/` (HTML or PDF).
-- An indexed source DocDB under `db/<name>.db`. Stage 1 reads from this DB; nothing earlier in the pipeline matters once it exists.
+Sisyphus is end-to-end (download → parse → index → label → extract); the first
+three stages are the `sisyphus run` CLI and all this phase needs is their output:
+a source DocDB at `db/<name>.db`. The label stage reads from this DB; nothing
+earlier matters once it exists. Inputs can be:
+- An existing `db/<name>.db` (skip straight ahead).
+- **Processed** HTML or PDFs to index directly.
+- Raw publisher downloads, or just a DOI list — produced/handled by `sisyphus run`.
 
 Detect the current state and act:
 
@@ -78,19 +82,38 @@ Ask the user to confirm it as the source DB. If they confirm, capture its base n
 
 If multiple `db/*.db` files exist, list them and ask which is the source.
 
-#### Case B — Raw `*.html` / `*.pdf` exist in `sources/` (or the project root)
+#### Case B — Processed `*.html` / `*.pdf` exist in `sources/` (or the project root)
 
-Tell the user what you found, then offer to index.
+This means **processed** HTML (has `<div id="sections">`) or PDFs — files the
+indexer can read directly. Tell the user what you found, then offer to index.
 
 - If files are sitting at the project root (not in `sources/`), create `sources/` and move them in. Announce the action in one line.
 - Ask: *"Do you want to index these as `db/<name>.db`? What should `<name>` be?"*
 - Once they answer, generate `sisyphus_script/stage0_index.py` (template below). Mention the filename and the expected output path. **Do not paste the script.**
 - Ask the user to run it (`uv run python sisyphus_script/stage0_index.py` or the equivalent for their env) and confirm `db/<name>.db` was created. Wait for confirmation.
 
-#### Case C — Nothing in `db/` and nothing in `sources/`
+> If the HTML is **raw publisher HTML/XML** (no `<div id="sections">`), it must be
+> parsed first — don't index it directly. Use `sisyphus run --no-download --db <name>`
+> (parse+index in one step) instead of `stage0_index.py`.
+
+#### Case C — Only a DOI list (no files yet)
+
+If the user has DOIs but no downloaded papers, the full ingestion is one command:
+
+```bash
+uv run sisyphus run dois.txt --db <name>
+```
+
+This downloads → parses → indexes into `db/<name>.db`. It needs the `crawler`
+extra (`sisyphus[crawler]` + `playwright install chromium`) and, for Elsevier
+(`10.1016/*`) DOIs, an Elsevier API key (`--els-api-key` or env `ELS_API_KEY`).
+Point the user at it, have them run it, and confirm `db/<name>.db` exists before
+moving on. (Other publishers don't need a key.)
+
+#### Case D — Nothing at all (no DB, no files, no DOI list)
 
 Pause and explicitly ask:
-> *"I don't see any source files. Please either drop your HTML / PDF papers into `sources/` in the project root, or point me to a folder containing them. Once they're in place, let me know and I'll index them."*
+> *"I don't see any source files. You can either: drop processed HTML / PDF papers into `sources/`, or give me a DOI list (a `.txt` of DOIs) to run `sisyphus run` on. Once something's in place, let me know."*
 
 Wait for the user. Do not infer; do not invent a path. This is the buffer state — the user may need a moment to copy files in or upload them.
 

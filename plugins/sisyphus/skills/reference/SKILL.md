@@ -1,7 +1,23 @@
 ---
 name: reference
-description: API reference for the sisyphus label → extract pipeline. Use when reading or writing code that imports `sisyphus`, `sisyphus.chain`, or related modules — covers the 6 core classes, data contracts between stages, strategy selection (isolated vs merged), and the Python-dependency setup check.
+description: API reference for the sisyphus paper-extraction pipeline. Use when reading or writing code that imports `sisyphus`, `sisyphus.chain`, or related modules — covers the end-to-end ingestion CLI (`sisyphus run`: download→parse→index), the 6 core chain classes, data contracts between stages, strategy selection (isolated vs merged), and the Python-dependency setup check.
 ---
+
+## Ingestion vs. extraction
+
+`sisyphus` is end-to-end: **download → parse → index → label → extract**.
+
+- **Stages 1–3 (ingestion)** turn DOIs (or downloaded files) into a source DocDB
+  via one CLI command — `sisyphus run dois.txt --db <name>` (see *Step 6* and the
+  build skill). This is fixed infrastructure; you don't write code for it.
+- **Stages 4–5 (extraction)** are the project-specific label→extract chain that
+  the rest of this reference covers. They read the `db/<name>.db` produced by
+  ingestion.
+
+The parse stage matters for indexing: `index.loader.ArticleLoader` reads the
+**processed** HTML emitted by the parse stage (`<div id="abstract">` /
+`<div id="sections">`), *not* raw publisher HTML. Raw downloads must go through
+`sisyphus run` (or `sisyphus.parse.parse_articles`) before indexing.
 
 ## Setup — check Python dependencies before generating code
 
@@ -43,7 +59,7 @@ If the import succeeds, skip to the pipeline workflow.
 
 ### Step 3 — install if missing
 
-Show the user the right command for their environment. **Do not run it silently** — these installs are large (chromadb, faiss, langchain, …) and may require user attention for compile errors, version pinning, or proxies.
+Show the user the right command for their environment. **Do not run it silently** — these installs are large (chromadb, langchain, …) and may require user attention for compile errors, version pinning, or proxies.
 
 ```bash
 # uv project
@@ -59,6 +75,11 @@ pipenv install "git+https://github.com/sukiluvcode/sisyphus-skill.git#egg=sisyph
 pip install "git+https://github.com/sukiluvcode/sisyphus-skill.git"
 ```
 
+To use the **download stage** (stage 1), add the `crawler` extra and a browser
+(append `[crawler]` to the package name, e.g.
+`uv add "sisyphus[crawler] @ git+..."`), then `playwright install chromium`.
+Parse + index do not need it.
+
 If the user has no project environment yet, recommend:
 
 ```bash
@@ -71,8 +92,9 @@ uv init && uv add "sisyphus @ git+https://github.com/sukiluvcode/sisyphus-skill.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `error: externally-managed-environment` | macOS / Linux PEP 668 on system Python | Use a venv: `python3 -m venv .venv && source .venv/bin/activate`, then retry |
-| `faiss-cpu` wheel build fails on Windows | Pre-built wheels for some Python versions are missing | Pin Python to 3.10–3.12; or `pip install faiss-cpu --only-binary=:all:` |
 | `chromadb` install hangs | Building from source on unusual platforms | Upgrade pip (`pip install -U pip`) and retry; chromadb >= 0.4.24 has wheels for common platforms |
+| `LookupError: punkt` from the indexer | NLTK sentence tokenizer data missing | `python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"` |
+| `playwright … Executable doesn't exist` during download | Browser not installed | `playwright install chromium` (after installing the `crawler` extra) |
 | `import sisyphus` works at shell but not in notebook | Notebook is using a different kernel/env | Install `ipykernel` in the same env and register it: `python -m ipykernel install --user --name=<env-name>` |
 
 Re-run Step 2 to confirm. Only proceed once the import succeeds.
@@ -88,24 +110,33 @@ echo "OPENAI_API_KEY=sk-..." >> .env
 
 ### Step 6 — locate (or build) the source DB
 
-`sisyphus` resolves source databases via `get_plain_articledb('<name>')`, which expects files under `db/` in the project root. Two cases:
+`sisyphus` resolves source databases via `get_plain_articledb('<name>')`, which expects files under `db/` in the project root. Three cases:
 
 **Case A — DB already exists.** Confirm `db/<name>.db` (or `*.sqlite`) is the source. If a stray DB file is at the project root, move it into `db/` (or copy it) and announce in one line. If multiple candidates exist, ask which is the source.
 
-**Case B — Only raw files exist.** If the user has `*.html` / `*.htm` / `*.pdf` files but no DB yet, run the indexer (see *Indexing source files* below). Raw files live under `sources/` by convention.
+**Case B — Files exist but no DB.**
+- **Processed HTML** (has `<div id="sections">`) or **PDFs**: run the indexer directly (see *Indexing source files* below). Convention: `articles_processed/` for processed HTML, `sources/` for PDFs.
+- **Raw publisher HTML/XML** (as downloaded — no `<div id="sections">`): parse it first, then index. `sisyphus run --no-download --db <name>` does parse+index in one step, or call `sisyphus.parse.parse_articles(raw_dir, 'articles_processed')` then index.
 
-If neither a DB nor source files exist, pause and ask the user to point at a folder or drop files into `sources/`. Don't invent paths.
+**Case C — Only DOIs (no files).** Run the full ingestion: `sisyphus run dois.txt --db <name>` (needs the `crawler` extra + an Elsevier key for `10.1016/*` DOIs). This downloads → parses → indexes into `db/<name>.db`.
+
+If none of the above apply, pause and ask the user to point at a folder, a DOI list, or drop files in. Don't invent paths.
 
 ---
 
 ## Indexing source files
 
-`sisyphus.index.create_plaindb` turns a folder of papers into the `db/<name>.db` that Stage 1 consumes. It auto-detects extensions:
+`sisyphus.index.create_plaindb` turns a folder of papers into the `db/<name>.db` that the label stage consumes. It auto-detects extensions:
 
 | Extension | Loader | Output Documents |
 |---|---|---|
 | `.html`, `.htm` | `ArticleLoader` (sectioned) or `FullTextLoader` if `full_text=True` | one Document per paragraph, with `sub_titles` carrying the section path |
 | `.pdf` | `PdfLoader` (always page-by-page) | one Document per page; long pages split with the same 200–600 token chunker |
+
+> **HTML must be _processed_ HTML** — the clean shape the parse stage emits
+> (`<div id="abstract">` / `<div id="sections">`, DOI in `<head><p><a>`). Raw
+> publisher HTML won't load; run it through `sisyphus.parse.parse_articles`
+> (or `sisyphus run`) first. PDFs are read directly.
 
 ```python
 from sisyphus.index import create_plaindb
@@ -141,7 +172,7 @@ print(len(docs), docs[0].metadata, docs[0].page_content[:300])
 
 ## Key invariants
 
-- The pipeline is **two stages**: Label (→ DocDB with labels) → Extract (→ ResultDB with records).
+- End-to-end the pipeline is **five stages**: download → parse → index → Label (→ DocDB with labels) → Extract (→ ResultDB with records). This reference covers the last two (the chain); ingestion is the `sisyphus run` CLI.
 - A `None` mid-chain short-circuits silently (no extractable content for that paper).
 - `FAILED` mid-chain signals a hard error; the file is NOT recorded in extraction history.
 - Vector embeddings for semantic search live in the **label stage** (`SemanticConfig`), not in the index step.

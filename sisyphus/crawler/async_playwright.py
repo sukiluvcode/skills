@@ -534,7 +534,10 @@ async def manager(doi_list: list[str], els_api_key: str, rate_limit: float = 0.1
         context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
         # if you need website cookies to enable some features, you need to use your own browser, but remind that cookies will be clear in acs and wil crawler everytimes.
         # context_for_rsc = await p.chromium.launch_persistent_context(headless=False, executable_path="C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", user_data_dir="C:\\Users\\Soike\\AppData\\Local\\Google\\Chrome\\User Data")
-        await context.add_init_script(path=f'{os.path.join("sisyphus", "lib", "stealth.min.js")}')
+        # Resolve stealth.min.js relative to the installed package, not cwd, so
+        # `sisyphus run` works from any working directory.
+        _stealth_js = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib", "stealth.min.js")
+        await context.add_init_script(path=_stealth_js)
         # await context_for_rsc.add_init_script(path=f'{os.path.join("sisyphus", "lib", "stealth.min.js")}')
 
         # instantiate crawlers.
