@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "sukiluvcode-skills",
+  "owner": {
+    "name": "sukiluvcode",
+    "email": "luvsoike@icloud.com"
+  },
+  "description": "Claude Code plugins from sukiluvcode for mining structured data from scientific papers.",
+  "plugins": [
+    {
+      "name": "sisyphus",
+      "source": "./plugins/sisyphus",
+      "description": "Two-stage label → extract pipeline for mining structured data from scientific papers. Run /sisyphus:build to be guided through labeling rules, extraction schemas, and a runnable pipeline.",
+      "category": "data-extraction",
+      "keywords": [
+        "materials-science",
+        "text-mining",
+        "extraction",
+        "langchain",
+        "scientific-papers"
+      ]
+    }
+  ]
+}

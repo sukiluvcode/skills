@@ -8,23 +8,24 @@ The plugin gives you a `/sisyphus:build` slash command that walks you through la
 
 ## Install the plugin
 
-### Option A — local development (this directory)
+### Option A — from the marketplace (recommended)
 
-```bash
-claude --plugin-dir /path/to/sisyphus-skill
-```
-
-Useful for testing changes; the plugin is loaded only for the current Claude Code session.
-
-### Option B — from a marketplace
-
-If this plugin is published to a marketplace you've added:
+This repo *is* a Claude Code marketplace. Add it, then install:
 
 ```text
-/plugin install sisyphus
+/plugin marketplace add sukiluvcode/skills
+/plugin install sisyphus@sukiluvcode-skills
 ```
 
-See [Discover and install plugins](https://code.claude.com/docs/en/discover-plugins) for marketplace setup.
+`/plugin marketplace update sukiluvcode-skills` pulls later releases.
+
+### Option B — local development (this directory)
+
+```bash
+claude --plugin-dir /path/to/sisyphus-skill/plugins/sisyphus
+```
+
+Useful for testing changes; the plugin is loaded only for the current Claude Code session. Note the path points at `plugins/sisyphus/` (the plugin root), not the repo root.
 
 ---
 
@@ -91,16 +92,17 @@ You run the generated scripts yourself — the plugin does code generation, not 
 
 | Path | Purpose |
 |---|---|
-| `.claude-plugin/plugin.json` | Plugin manifest |
-| `skills/build/SKILL.md` | The `/sisyphus:build` workflow (user-invoked) |
-| `skills/reference/SKILL.md` | The `/sisyphus:reference` API skill (auto-invoked); contains the dependency setup check |
-| `references/GUIDE.md` | Template decision tree |
-| `references/single_prop.py` | One-property template |
-| `references/multi_props_isolated.py` | Multiple independent properties |
-| `references/multi_props.py` | Coupled properties + synthesis context (HEAs) |
-| `references/processing_template.py` | Synthesis-process templates |
-| `sisyphus/` | The Python package (chain, index, patch, utils) |
-| `pyproject.toml` | Build config — hatchling, dependencies |
+| `.claude-plugin/marketplace.json` | Marketplace catalog — lists the `sisyphus` plugin |
+| `plugins/sisyphus/.claude-plugin/plugin.json` | Plugin manifest |
+| `plugins/sisyphus/skills/build/SKILL.md` | The `/sisyphus:build` workflow (user-invoked) |
+| `plugins/sisyphus/skills/reference/SKILL.md` | The `/sisyphus:reference` API skill (auto-invoked); contains the dependency setup check |
+| `plugins/sisyphus/references/GUIDE.md` | Template decision tree |
+| `plugins/sisyphus/references/single_prop.py` | One-property template |
+| `plugins/sisyphus/references/multi_props_isolated.py` | Multiple independent properties |
+| `plugins/sisyphus/references/multi_props.py` | Coupled properties + synthesis context (HEAs) |
+| `plugins/sisyphus/references/processing_template.py` | Synthesis-process templates |
+| `sisyphus/` | The Python package (chain, index, patch, utils) — installed separately into your project env |
+| `pyproject.toml` | Build config for the Python package — hatchling, dependencies |
 
 ## Pipeline shape
 
@@ -109,7 +111,7 @@ Stage 1 — Label    Filter(source_db) + Labeling(labeler, ...) + Saver('labeled
 Stage 2 — Extract  Filter(labeled_db) + load + Extraction(extractor, ...) + Writer(result_db)
 ```
 
-See `references/GUIDE.md` for which template fits your use case.
+See `plugins/sisyphus/references/GUIDE.md` for which template fits your use case.
 
 ---
 

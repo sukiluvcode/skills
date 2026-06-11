@@ -38,16 +38,24 @@ sisyphus/
     async_control_flow.py    # Async rate-bucket (used by crawler)
   crawler/           # Article downloader — OUT OF SCOPE for the chain skill
 
-references/          # Copy-and-adapt pipeline templates
-  GUIDE.md               # Template decision tree
-  single_prop.py         # One property, regex only
-  multi_props_isolated.py # Multiple independent properties
-  multi_props.py         # Coupled properties + synthesis context (HEAs)
-  processing_template.py # Synthesis process templates
+.claude-plugin/
+  marketplace.json   # Marketplace catalog — lists the sisyphus plugin (source: ./plugins/sisyphus)
 
-.claude/commands/
-  sisyphus.md        # /sisyphus slash command — guides pipeline code generation
+plugins/sisyphus/    # The Claude Code plugin (this is what gets installed)
+  .claude-plugin/
+    plugin.json          # Plugin manifest
+  skills/
+    build/SKILL.md       # /sisyphus:build — user-invoked pipeline-building workflow
+    reference/SKILL.md   # /sisyphus:reference — auto-invoked API skill + dependency setup check
+  references/          # Copy-and-adapt pipeline templates (read via ${CLAUDE_PLUGIN_ROOT}/references/)
+    GUIDE.md               # Template decision tree
+    single_prop.py         # One property, regex only
+    multi_props_isolated.py # Multiple independent properties
+    multi_props.py         # Coupled properties + synthesis context (HEAs)
+    processing_template.py # Synthesis process templates
 ```
+
+The repo is **both** a marketplace and the home of the Python package. The plugin (`plugins/sisyphus/`) ships only skills + templates; the `sisyphus/` package is installed separately into the user's project env via `git+https://github.com/sukiluvcode/skills.git`, not bundled into the plugin.
 
 ## Key invariants
 
